@@ -1,33 +1,44 @@
-// Código original de Compra A, tal como está publicado en la tienda:
-// tienda-ucjc-compra/tienda-ucjc-compra, rama gh-pages, v0.2.0/remote.js (rediseño del 17/11).
-// Nombres de variables recuperados de su src/main.js (tag v0.2.0). Sin cambios de comportamiento.
+// Compra B: parte del código de Compra A (tienda-ucjc-compra/tienda-ucjc-compra, gh-pages v0.2.0/remote.js)
+// y lo mejora. Misma etiqueta y mismos eventos @1; cambia el aspecto y se corrigen fallos.
 const EVT_ADD = 'ucjc:descubrimiento:anadir-al-carrito@1';
 const EVT_SES = 'ucjc:identidad:sesion-cambiada@1';
 const EVT_PED = 'ucjc:compra:pedido-confirmado@1';
+
+const euros = (n) => `${n.toFixed(2).replace('.', ',')} €`;
+// El nombre del producto viene de otra pieza: se escapa antes de meterlo en innerHTML.
+const esc = (t) =>
+  String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const css = `
   :host { display:block; font:16px/1.5 Arial,Helvetica,sans-serif; color:#222; }
   header { background:#1f3a63; color:#fff; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }
   header h1 { margin:0; font-size:20px; }
-  header span { font-size:14px; }
-  main { max-width:640px; margin:28px auto; padding:0 16px; }
+  .chip { font-size:13px; padding:2px 10px; border-radius:999px; background:#e3f1e7; color:#14532d; font-weight:700; }
+  .chip.sin { background:#ffe7c2; color:#6b3d00; }
+  main { max-width:640px; margin:24px auto; padding:0 16px; }
+  ol.pasos { display:flex; gap:6px; list-style:none; padding:0; margin:0 0 14px; font-size:13px; }
+  ol.pasos li { flex:1; text-align:center; padding:4px; border-radius:6px; background:#eef1f6; color:#555; }
+  ol.pasos li.hecho { background:#1f3a63; color:#fff; font-weight:700; }
   h2 { font-size:20px; margin:0 0 4px; }
   .sub { margin:0 0 16px; color:#555; font-size:14px; }
   .box { background:#fff; border:1px solid #ccc; border-radius:10px; padding:16px; }
-  .lista { height:180px; overflow-y:auto; border-bottom:1px solid #eee; }
-  .lista::-webkit-scrollbar { width:10px; }
-  .lista::-webkit-scrollbar-track { background:#f0f0f0; border-radius:5px; }
-  .lista::-webkit-scrollbar-thumb { background:#b5bcc8; border-radius:5px; }
+  .lista { max-height:240px; overflow-y:auto; border-bottom:1px solid #eee; }
   table { width:100%; border-collapse:collapse; }
   th { position:sticky; top:0; background:#fff; text-align:left; font-size:13px; color:#555; border-bottom:1px solid #d5d9e0; padding:6px 4px; }
-  td { padding:8px 4px; border-bottom:1px solid #eee; }
+  td { padding:8px 4px; border-bottom:1px solid #eee; vertical-align:middle; }
   .r { text-align:right; }
-  .vacio { color:#777; font-style:italic; }
+  .ud { display:block; font-size:12px; color:#666; }
+  .cant { display:inline-flex; align-items:center; gap:6px; }
+  .cant button { width:30px; height:30px; padding:0; border-radius:50%; font-size:16px; line-height:1; }
+  .quitar { padding:2px 8px; font-size:13px; }
+  .vacio { color:#555; font-style:italic; text-align:center; padding:18px 4px; }
   .total { text-align:right; font-size:18px; margin:14px 0; }
-  .row { display:flex; flex-wrap:wrap; gap:8px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   button { font:inherit; font-size:15px; padding:8px 16px; border:1px solid #c4c4c4; border-radius:8px; background:#ececec; color:#222; cursor:pointer; }
   button.main { background:#1f3a63; color:#fff; border-color:#1f3a63; margin-left:auto; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
+  button:disabled { background:#e6e6e6; color:#6b6b6b; border-color:#d0d0d0; cursor:not-allowed; }
+  button:focus-visible { outline:3px solid #f2a900; outline-offset:2px; }
+  .motivo { margin:10px 0 0; font-size:14px; color:#6b3d00; text-align:right; }
   .ok { margin:12px 0 0; font-size:14px; color:#1d6b2f; min-height:1.2em; }
 `;
 
@@ -38,24 +49,34 @@ class UcjcCompra extends HTMLElement {
 
   #onAdd = (e) => {
     const d = e.detail || {};
-    this.#lineas.push({
-      productoId: String(d.productoId ?? ''),
-      nombre: String(d.nombre ?? 'Producto'),
-      precio: Number(d.precio) || 0,
-      cantidad: Math.max(1, Number(d.cantidad) || 1),
-    });
+    if (!d.productoId) return;
+    const cantidad = Math.max(1, Number(d.cantidad) || 1);
+    // Mejora: el mismo producto suma cantidad en su línea en vez de repetir filas.
+    const existente = this.#lineas.find((l) => l.productoId === String(d.productoId));
+    if (existente) existente.cantidad += cantidad;
+    else
+      this.#lineas.push({
+        productoId: String(d.productoId),
+        nombre: String(d.nombre ?? 'Producto'),
+        precio: Number(d.precio) || 0,
+        cantidad,
+      });
     this.#flash = `Añadido: ${d.nombre || d.productoId}`;
     this.#pintar();
   };
 
   #onSes = (e) => {
     const d = e.detail || {};
-    this.#usuarioId = d.autenticado ? d.usuario?.id ?? null : null;
+    const antes = this.#usuarioId;
+    this.#usuarioId = d.autenticado === true && d.usuario ? d.usuario.id ?? null : null;
+    // Corrección: al cambiar de usuario no se deja a la vista el pedido confirmado por el anterior.
+    if (antes !== this.#usuarioId) this.#flash = '';
     this.#pintar();
   };
 
   connectedCallback() {
-    this.attachShadow({ mode: 'open' });
+    // Corrección: el shell puede quitar y volver a poner el elemento; attachShadow dos veces lanza error.
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     window.addEventListener(EVT_ADD, this.#onAdd);
     window.addEventListener(EVT_SES, this.#onSes);
     this.#pintar();
@@ -70,10 +91,17 @@ class UcjcCompra extends HTMLElement {
     return this.#lineas.reduce((s, l) => s + l.precio * l.cantidad, 0);
   }
 
+  // Mejora: el botón desactivado dice por qué (null si se puede confirmar).
+  #motivo() {
+    if (!this.#lineas.length) return 'El carrito está vacío: añade un producto del catálogo para poder confirmar.';
+    if (!this.#usuarioId) return 'Inicia sesión en Identidad para confirmar el pedido.';
+    return null;
+  }
+
   #confirmar() {
-    if (!this.#usuarioId || !this.#lineas.length) return;
+    if (this.#motivo()) return;
     const pedidoId = `PED-${Date.now()}`;
-    const lineas = this.#lineas.map((l) => ({ ...l }));
+    const lineas = this.#lineas.map(({ productoId, nombre, precio, cantidad }) => ({ productoId, nombre, precio, cantidad }));
     const detail = {
       pedidoId,
       usuarioId: this.#usuarioId,
@@ -83,49 +111,83 @@ class UcjcCompra extends HTMLElement {
     };
     window.dispatchEvent(new CustomEvent(EVT_PED, { detail }));
     this.#lineas = [];
-    this.#flash = `Pedido ${pedidoId} confirmado (${detail.total.toFixed(2)} €)`;
+    this.#flash = `Pedido ${pedidoId} confirmado (${euros(detail.total)})`;
+    this.#pintar();
+  }
+
+  #cambiar(productoId, delta) {
+    const l = this.#lineas.find((x) => x.productoId === productoId);
+    if (!l) return;
+    l.cantidad += delta;
+    if (l.cantidad < 1) this.#lineas = this.#lineas.filter((x) => x !== l);
+    this.#flash = '';
     this.#pintar();
   }
 
   #pintar() {
-    const ses = this.#usuarioId ? `Sesión: ${this.#usuarioId}` : 'Sin sesión — inicia sesión en Identidad para confirmar';
-    const filas = this.#lineas.length
+    const motivo = this.#motivo();
+    const hay = this.#lineas.length > 0;
+    const filas = hay
       ? this.#lineas
-          .map((l) => `<tr><td>${l.nombre}</td><td class="r">${l.cantidad}</td><td class="r">${(l.precio * l.cantidad).toFixed(2)} €</td></tr>`)
+          .map((l) => {
+            const n = esc(l.nombre);
+            const id = esc(l.productoId);
+            return `<tr>
+              <td>${n}<span class="ud">${euros(l.precio)} / ud.</span></td>
+              <td class="r"><span class="cant">
+                <button type="button" data-menos="${id}" aria-label="Quitar una unidad de ${n}">−</button>
+                <span>${l.cantidad}</span>
+                <button type="button" data-mas="${id}" aria-label="Añadir una unidad de ${n}">+</button>
+              </span></td>
+              <td class="r">${euros(l.precio * l.cantidad)}</td>
+              <td class="r"><button type="button" class="quitar" data-quitar="${id}" aria-label="Quitar ${n} del carrito">Quitar</button></td>
+            </tr>`;
+          })
           .join('')
-      : '<tr><td colspan="3" class="vacio">Carrito vacío — espera un «añadir» de Descubrimiento o usa el botón demo</td></tr>';
+      : '<tr><td colspan="4" class="vacio">Tu carrito está vacío. Añade productos desde el catálogo.</td></tr>';
 
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
-      <header><h1>UCJC Compra</h1><span>${ses}</span></header>
+      <header>
+        <h1>UCJC Compra</h1>
+        <span class="chip ${this.#usuarioId ? '' : 'sin'}">${this.#usuarioId ? `Sesión: ${esc(this.#usuarioId)}` : 'Sin sesión'}</span>
+      </header>
       <main>
+        <ol class="pasos" aria-label="Progreso de la compra">
+          <li class="${hay ? 'hecho' : ''}">1. Carrito</li>
+          <li class="${this.#usuarioId ? 'hecho' : ''}">2. Sesión</li>
+          <li class="${motivo ? '' : 'hecho'}">3. Confirmar</li>
+        </ol>
         <h2>Carrito</h2>
         <p class="sub">Revisa los productos antes de confirmar el pedido.</p>
         <div class="box">
           <div class="lista"><table>
-            <tr><th>Producto</th><th class="r">Cantidad</th><th class="r">Precio</th></tr>
+            <tr><th>Producto</th><th class="r">Cantidad</th><th class="r">Precio</th><th><span hidden>Acciones</span></th></tr>
             ${filas}
           </table></div>
-          <p class="total"><b>Total: ${this.#total().toFixed(2)} €</b></p>
+          <p class="total"><b>Total: <span data-total>${euros(this.#total())}</span></b></p>
           <div class="row">
-            <button type="button" data-a="demo">+ Producto demo</button>
-            <button type="button" data-a="vaciar" ${this.#lineas.length ? '' : 'disabled'}>Vaciar</button>
-            <button type="button" data-a="ok" class="main" ${this.#usuarioId && this.#lineas.length ? '' : 'disabled'}>Confirmar pedido</button>
+            <button type="button" data-a="vaciar" ${hay ? '' : 'disabled'}>Vaciar</button>
+            <button type="button" data-a="ok" class="main" ${motivo ? 'disabled aria-describedby="motivo"' : ''}>Confirmar pedido</button>
           </div>
-          <p class="ok">${this.#flash}</p>
+          ${motivo ? `<p id="motivo" class="motivo">${motivo}</p>` : ''}
+          <p class="ok" role="status">${esc(this.#flash)}</p>
         </div>
       </main>`;
 
-    this.shadowRoot.querySelector('[data-a="demo"]').onclick = () => {
-      this.#onAdd({ detail: { productoId: 'prod-demo', nombre: 'Camiseta UCJC (demo)', precio: 19.99, cantidad: 1 } });
-    };
-    this.shadowRoot.querySelector('[data-a="ok"]').onclick = () => this.#confirmar();
-    this.shadowRoot.querySelector('[data-a="vaciar"]').onclick = () => {
+    const r = this.shadowRoot;
+    r.querySelector('[data-a="ok"]').onclick = () => this.#confirmar();
+    r.querySelector('[data-a="vaciar"]').onclick = () => {
       this.#lineas = [];
       this.#flash = 'Carrito vacío';
       this.#pintar();
     };
+    r.querySelectorAll('[data-mas]').forEach((b) => (b.onclick = () => this.#cambiar(b.dataset.mas, +1)));
+    r.querySelectorAll('[data-menos]').forEach((b) => (b.onclick = () => this.#cambiar(b.dataset.menos, -1)));
+    r.querySelectorAll('[data-quitar]').forEach((b) => (b.onclick = () => this.#cambiar(b.dataset.quitar, -Infinity)));
   }
 }
 
-customElements.define('ucjc-compra', UcjcCompra);
+if (!customElements.get('ucjc-compra')) {
+  customElements.define('ucjc-compra', UcjcCompra);
+}

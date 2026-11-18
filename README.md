@@ -7,7 +7,18 @@ Custom element: `<ucjc-compra>` (el mismo que Compra A, para que el shell pueda 
 
 ## Qué cambia respecto a Compra A
 
-Solo el aspecto y la usabilidad: tarjeta con pasos (carrito · sesión · confirmar), botones + y − por línea, productos repetidos agrupados en una línea y un texto que explica por qué no se puede confirmar todavía. Los eventos y sus campos son los mismos.
+Compra B **parte del código de Compra A** (lo que la tienda carga hoy: `gh-pages`, `v0.2.0/remote.js`, rediseño del 17/11; ver el primer commit de este repo) y lo mejora sin tocar etiqueta ni eventos:
+
+| Compra A | Compra B |
+|---|---|
+| Confirmar desactivado sin explicación | Texto que dice por qué no se puede confirmar (carrito vacío o sin sesión) |
+| El mismo producto repetido ocupa varias filas | Se agrupa en una fila y suma cantidad |
+| Sin forma de cambiar cantidades | Botones + y − y «Quitar» por línea |
+| Botón «+ Producto demo» en la tienda real | Quitado |
+| Nombre del producto metido en HTML sin escapar | Escapado (un nombre con `<img>` se ve como texto) |
+| `attachShadow` en cada `connectedCallback`: falla si el shell mueve el elemento | Se crea una sola vez |
+| Tras cerrar sesión sigue visible el pedido del usuario anterior | Se limpia al cambiar de usuario |
+| — | Pasos Carrito · Sesión · Confirmar, foco visible y avisos con `role="status"` |
 
 ## Equipo
 

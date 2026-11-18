@@ -10,10 +10,10 @@ const entrar = () => emitir(SES, { autenticado: true, usuario: { id: 'u-demo', e
 const salir = () => emitir(SES, { autenticado: false, usuario: null });
 const camiseta = { productoId: 'p-1', nombre: 'Camiseta', precio: 19.99, cantidad: 1 };
 
-describe('ucjc-compra (Compra B)', () => {
+describe('ucjc-compra (Compra B, sobre el código de Compra A)', () => {
   let el;
   const $ = (s) => el.shadowRoot.querySelector(s);
-  const confirmar = () => $('[data-a="confirmar"]');
+  const confirmar = () => $('[data-a="ok"]');
 
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -22,7 +22,7 @@ describe('ucjc-compra (Compra B)', () => {
   });
 
   it('exporta los metadatos de carga de Compra', () => {
-    expect(mod).toEqual({ nombre: 'compra', version: '0.1.0' });
+    expect(mod).toEqual({ nombre: 'compra', version: '0.2.0' });
     expect(customElements.get('ucjc-compra')).toBeDefined();
   });
 
@@ -42,7 +42,7 @@ describe('ucjc-compra (Compra B)', () => {
   it('suma cantidades del mismo producto y calcula el total', () => {
     emitir(ADD, camiseta);
     emitir(ADD, { ...camiseta, cantidad: 2 });
-    expect(el.shadowRoot.querySelectorAll('ul.lineas li').length).toBe(1);
+    expect(el.shadowRoot.querySelectorAll('[data-quitar]').length).toBe(1);
     expect($('[data-total]').textContent).toBe('59,97 €');
   });
 
@@ -58,7 +58,7 @@ describe('ucjc-compra (Compra B)', () => {
     expect(d).toMatchObject({ usuarioId: 'u-demo', total: 34.99 });
     expect(d.lineas[1]).toEqual({ productoId: 'p-2', nombre: 'Taza', precio: 7.5, cantidad: 2 });
     expect(new Date(d.creadoEn).toISOString()).toBe(d.creadoEn);
-    expect(el.shadowRoot.querySelectorAll('ul.lineas li').length).toBe(0);
+    expect(el.shadowRoot.querySelectorAll('[data-quitar]').length).toBe(0);
     window.removeEventListener(PED, spy);
   });
 
@@ -82,7 +82,36 @@ describe('ucjc-compra (Compra B)', () => {
 
   it('el nombre del producto se muestra como texto, no como HTML', () => {
     emitir(ADD, { ...camiseta, nombre: '<img src=x>' });
-    expect(el.shadowRoot.querySelector('ul img')).toBeNull();
+    expect(el.shadowRoot.querySelector('table img')).toBeNull();
+  });
+
+  it('no muestra el botón de producto demo de Compra A', () => {
+    expect($('[data-a="demo"]')).toBeNull();
+  });
+
+  it('el botón Quitar elimina la línea entera', () => {
+    emitir(ADD, { ...camiseta, cantidad: 3 });
+    $('[data-quitar="p-1"]').click();
+    expect($('.vacio')).not.toBeNull();
+  });
+
+  it('al cambiar de usuario no deja a la vista el pedido del anterior', () => {
+    entrar();
+    emitir(ADD, camiseta);
+    confirmar().click();
+    expect($('.ok').textContent).toContain('confirmado');
+    salir();
+    expect($('.ok').textContent).toBe('');
+  });
+
+  it('se puede quitar y volver a poner sin errores (attachShadow una sola vez)', () => {
+    const errores = vi.fn((e) => e.preventDefault());
+    window.addEventListener('error', errores);
+    el.remove();
+    document.body.appendChild(el);
+    window.removeEventListener('error', errores);
+    expect(errores).not.toHaveBeenCalled();
+    expect($('h1').textContent).toBe('UCJC Compra');
   });
 
   it('al quitarlo del DOM deja de escuchar eventos', () => {
