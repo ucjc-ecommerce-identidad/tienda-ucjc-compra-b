@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tienda UCJC · Compra B (página propia)</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 15px/1.45 system-ui, sans-serif; color: #1d2b22; background: #fafafa; }
+      main { display: grid; gap: 1.25rem; max-width: 46rem; }
+      h1 { margin: 0; font-size: 1.25rem; }
+      p { margin: 0; color: #4a5a50; }
+      .sim { display: flex; flex-wrap: wrap; gap: .5rem; }
+      .sim button { font: inherit; padding: .4rem .7rem; border: 1px solid #b7c7bc; border-radius: 8px; background: #fff; cursor: pointer; }
+      pre { margin: 0; padding: .75rem; background: #fff; border: 1px solid #d8e2db; border-radius: 8px; font-size: 12px; white-space: pre-wrap; min-height: 4rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Compra B · página propia</h1>
+      <p>Carga el mismo <code>remote.js</code> que usaría el shell. Los botones simulan a Identidad y Descubrimiento con los eventos <code>@1</code> firmados.</p>
+      <div class="sim" aria-label="Simular otras piezas">
+        <button type="button" data-sim="entrar">Simular login (u-demo)</button>
+        <button type="button" data-sim="salir">Simular logout</button>
+        <button type="button" data-sim="camiseta">Añadir «Camiseta» 19,99 €</button>
+        <button type="button" data-sim="taza">Añadir «Taza» 7,50 €</button>
+      </div>
+      <ucjc-compra></ucjc-compra>
+      <section>
+        <p>Eventos <code>ucjc:compra:pedido-confirmado@1</code> emitidos:</p>
+        <pre id="log"></pre>
+      </section>
+    </main>
+    <script type="module">
+      const emitir = (t, detail) => window.dispatchEvent(new CustomEvent(t, { detail }));
+      const SES = 'ucjc:identidad:sesion-cambiada@1';
+      const ADD = 'ucjc:descubrimiento:anadir-al-carrito@1';
+      const sims = {
+        entrar: () => emitir(SES, { autenticado: true, usuario: { id: 'u-demo', email: 'demo@alumno.ucjc.edu', nombre: 'Usuario demo' }, momento: new Date().toISOString() }),
+        salir: () => emitir(SES, { autenticado: false, usuario: null, momento: new Date().toISOString() }),
+        camiseta: () => emitir(ADD, { productoId: 'prod-101', nombre: 'Camiseta', precio: 19.99, cantidad: 1 }),
+        taza: () => emitir(ADD, { productoId: 'prod-202', nombre: 'Taza', precio: 7.5, cantidad: 1 }),
+      };
+      document.querySelectorAll('[data-sim]').forEach((b) => (b.onclick = sims[b.dataset.sim]));
+      const log = document.getElementById('log');
+      window.addEventListener('ucjc:compra:pedido-confirmado@1', (e) => {
+        log.textContent = JSON.stringify(e.detail, null, 2) + '\n\n' + log.textContent;
+      });
+      const { default: meta } = await import('./remote.js');
+      document.title += ` · v${meta.version}`;
+    </script>
+  </body>
+</html>
