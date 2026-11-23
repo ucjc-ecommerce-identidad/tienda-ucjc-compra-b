@@ -3,6 +3,9 @@
 const EVT_ADD = 'ucjc:descubrimiento:anadir-al-carrito@1';
 const EVT_SES = 'ucjc:identidad:sesion-cambiada@1';
 const EVT_PED = 'ucjc:compra:pedido-confirmado@1';
+// Black Friday (contrato en `propuesto` desde el 23/11): solo se escucha para mostrar un aviso.
+// No cambia el carrito, los precios ni el pedido-confirmado@1.
+const EVT_CAMP = 'ucjc:descubrimiento:campana-cambiada@1';
 
 const euros = (n) => `${n.toFixed(2).replace('.', ',')} €`;
 // El nombre del producto viene de otra pieza: se escapa antes de meterlo en innerHTML.
@@ -39,6 +42,7 @@ const css = `
   button:disabled { background:#e6e6e6; color:#6b6b6b; border-color:#d0d0d0; cursor:not-allowed; }
   button:focus-visible { outline:3px solid #f2a900; outline-offset:2px; }
   .motivo { margin:10px 0 0; font-size:14px; color:#6b3d00; text-align:right; }
+  .campana { margin:0 0 14px; padding:10px 14px; border-radius:8px; background:#111; color:#ffd400; font-weight:700; text-align:center; }
   .ok { margin:12px 0 0; font-size:14px; color:#1d6b2f; min-height:1.2em; }
 `;
 
@@ -46,6 +50,7 @@ class UcjcCompra extends HTMLElement {
   #lineas = [];
   #usuarioId = null;
   #flash = '';
+  #campana = null; // { codigo, etiqueta } mientras haya una campaña encendida
 
   #onAdd = (e) => {
     const d = e.detail || {};
@@ -74,17 +79,29 @@ class UcjcCompra extends HTMLElement {
     this.#pintar();
   };
 
+  #onCamp = (e) => {
+    const d = e.detail || {};
+    // Payload que no cumple el contrato (activa no booleana): se ignora y se queda como estaba.
+    if (typeof d.activa !== 'boolean') return;
+    this.#campana = d.activa
+      ? { codigo: String(d.codigo ?? ''), etiqueta: String(d.etiqueta || d.codigo || 'Campaña activa') }
+      : null;
+    this.#pintar();
+  };
+
   connectedCallback() {
     // Corrección: el shell puede quitar y volver a poner el elemento; attachShadow dos veces lanza error.
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     window.addEventListener(EVT_ADD, this.#onAdd);
     window.addEventListener(EVT_SES, this.#onSes);
+    window.addEventListener(EVT_CAMP, this.#onCamp);
     this.#pintar();
   }
 
   disconnectedCallback() {
     window.removeEventListener(EVT_ADD, this.#onAdd);
     window.removeEventListener(EVT_SES, this.#onSes);
+    window.removeEventListener(EVT_CAMP, this.#onCamp);
   }
 
   #total() {
@@ -153,6 +170,7 @@ class UcjcCompra extends HTMLElement {
         <span class="chip ${this.#usuarioId ? '' : 'sin'}">${this.#usuarioId ? `Sesión: ${esc(this.#usuarioId)}` : 'Sin sesión'}</span>
       </header>
       <main>
+        ${this.#campana ? `<p class="campana" role="status" data-campana="${esc(this.#campana.codigo)}">${esc(this.#campana.etiqueta)}</p>` : ''}
         <ol class="pasos" aria-label="Progreso de la compra">
           <li class="${hay ? 'hecho' : ''}">1. Carrito</li>
           <li class="${this.#usuarioId ? 'hecho' : ''}">2. Sesión</li>

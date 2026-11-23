@@ -4,6 +4,8 @@ import mod from './main.js';
 const SES = 'ucjc:identidad:sesion-cambiada@1';
 const ADD = 'ucjc:descubrimiento:anadir-al-carrito@1';
 const PED = 'ucjc:compra:pedido-confirmado@1';
+const CAMP = 'ucjc:descubrimiento:campana-cambiada@1';
+const bf = { codigo: 'black-friday-2026', etiqueta: 'Black Friday UCJC', momento: '2026-11-27T09:00:00+01:00' };
 
 const emitir = (tipo, detail) => window.dispatchEvent(new CustomEvent(tipo, { detail }));
 const entrar = () => emitir(SES, { autenticado: true, usuario: { id: 'u-demo', email: 'demo@alumno.ucjc.edu' } });
@@ -22,7 +24,7 @@ describe('ucjc-compra (Compra B, sobre el código de Compra A)', () => {
   });
 
   it('exporta los metadatos de carga de Compra', () => {
-    expect(mod).toEqual({ nombre: 'compra', version: '0.2.0' });
+    expect(mod).toEqual({ nombre: 'compra', version: '0.3.0' });
     expect(customElements.get('ucjc-compra')).toBeDefined();
   });
 
@@ -119,5 +121,37 @@ describe('ucjc-compra (Compra B, sobre el código de Compra A)', () => {
     emitir(ADD, camiseta);
     document.body.appendChild(el);
     expect($('.vacio')).not.toBeNull();
+  });
+
+  it('campana-cambiada@1: muestra el aviso al encender y lo quita al apagar', () => {
+    expect($('.campana')).toBeNull();
+    emitir(CAMP, { ...bf, activa: true });
+    expect($('.campana').textContent).toBe('Black Friday UCJC');
+    expect($('.campana').dataset.campana).toBe('black-friday-2026');
+    emitir(CAMP, { ...bf, activa: false });
+    expect($('.campana')).toBeNull();
+  });
+
+  it('campana-cambiada@1: ignora un payload sin activa booleana y escapa la etiqueta', () => {
+    emitir(CAMP, { ...bf, activa: 'si' });
+    expect($('.campana')).toBeNull();
+    emitir(CAMP, { ...bf, activa: true, etiqueta: '<img src=x onerror=alert(1)>' });
+    expect($('.campana img')).toBeNull();
+    expect($('.campana').textContent).toBe('<img src=x onerror=alert(1)>');
+  });
+
+  it('campana-cambiada@1: no cambia el carrito ni el pedido-confirmado@1', () => {
+    const spy = vi.fn();
+    window.addEventListener(PED, spy);
+    entrar();
+    emitir(ADD, camiseta);
+    emitir(CAMP, { ...bf, activa: true });
+    expect($('[data-total]').textContent).toBe('19,99 €');
+    confirmar().click();
+    const d = spy.mock.calls.at(-1)[0].detail;
+    expect(Object.keys(d).sort()).toEqual(['creadoEn', 'lineas', 'pedidoId', 'total', 'usuarioId']);
+    expect(d.total).toBe(19.99);
+    window.removeEventListener(PED, spy);
+    emitir(CAMP, { ...bf, activa: false });
   });
 });

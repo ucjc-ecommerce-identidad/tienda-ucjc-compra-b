@@ -37,6 +37,9 @@ Compra B **parte del código de Compra A** (lo que la tienda carga hoy: `gh-page
 | `ucjc:identidad:sesion-cambiada@1` | escucha | Guarda `usuario.id`; solo deja confirmar si `autenticado === true` |
 | `ucjc:descubrimiento:anadir-al-carrito@1` | escucha | Añade la línea (o suma cantidad si el producto ya está) |
 | `ucjc:compra:pedido-confirmado@1` | emite | `pedidoId`, `usuarioId`, `creadoEn`, `total`, `lineas[]` |
+| `ucjc:descubrimiento:campana-cambiada@1` (`propuesto`, Black Friday) | escucha | Desde v0.3.0: con `activa: true` muestra `etiqueta` en un aviso sobre el carrito; con `false` lo quita. No toca precios, carrito ni `pedido-confirmado@1`. Si `activa` no es booleano, se ignora |
+
+Si Descubrimiento emite el estado de la campaña antes de que Compra B esté cargada, Compra B no lo ve y arranca sin aviso hasta el siguiente cambio: el contrato no tiene forma de consultar el estado actual.
 
 ## Cómo arrancarlo
 
