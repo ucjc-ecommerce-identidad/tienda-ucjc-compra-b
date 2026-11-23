@@ -3,6 +3,8 @@
 Segunda versión de la pieza **Compra** de la Tienda UCJC (prueba A/B del shell). La mantiene el equipo Identidad.
 Compra A es [`tienda-ucjc-compra/tienda-ucjc-compra`](https://github.com/tienda-ucjc-compra/tienda-ucjc-compra).
 
+**Release vigente: `v0.3.0`** · para el shell: https://ucjc-ecommerce-identidad.github.io/tienda-ucjc-compra-b/v0.3.0/remote.js · página propia: https://ucjc-ecommerce-identidad.github.io/tienda-ucjc-compra-b/v0.3.0/
+
 Custom element: `<ucjc-compra>` (el mismo que Compra A, para que el shell pueda cambiar una por otra sin romper nada).
 
 ## Qué cambia respecto a Compra A
